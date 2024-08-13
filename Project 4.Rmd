@@ -1,0 +1,106 @@
+---
+title: "Project 4"
+output: pdf_document
+date: "2024-03-31"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(ggplot2)
+library(leaps)
+library(glmnet)
+library(MASS)
+wine <- read.table("~/wine.txt", header = T, sep = '')
+View(wine)
+```
+
+1(a) Fit a linear regression model using all predictors and compute its
+test MSE
+```{r}
+# make the full model of the data
+full <- lm(Quality ~ ., data = wine)
+# compute the loocv
+compute_loocv <- function(full){
+  mse <- numeric(length = nrow(wine))
+  for(i in 1:nrow(wine)) {
+    model <- lm(Quality ~ ., data = wine[-i, ])
+    mse[i] <- (wine[i, "Quality"] - predict(model, newdata = wine[i,]))^2
+  }
+  return(mean(mse))
+}
+full_mse <- compute_loocv(full)
+full_mse
+
+```
+1(b) Use best-subset selection based on adjusted R2 to find the best linear 
+regression model. Compute the test MSE of the best model.
+```{r}
+model <- regsubsets(Quality ~ ., data = wine, method = "exhaustive")
+best_subset_model <- summary(model)$which[which.max(summary(model)$adjr2),]
+best_subset_predictors <- names(best_subset_model)[-1]
+best_subset_lm <- lm(Quality ~ ., data = wine[, c(best_subset_predictors,
+                                                  "Quality")])
+best_subset_mse <- compute_loocv(best_subset_lm)
+best_subset_mse
+```
+1(c) Use forward stepwise selection based on adjusted R2 to find the best linear
+regression model.Compute the test MSE of the best model.
+```{r}
+model <- regsubsets(Quality ~ ., data = wine, method = "forward")
+best_forward_model <- summary(model)$which[which.max(summary(model)$adjr2), ]
+best_forward_predictors <- names(best_forward_model)[-1]
+best_forward_lm <- lm(Quality ~ ., data = wine[, c(best_forward_predictors,
+                                                  "Quality")])
+best_forward_mse <- compute_loocv(best_forward_lm)
+best_forward_mse
+```
+1(d)  Use backward stepwise selection based on adjusted R2 to find the best 
+linear regression model. Compute the test MSE of the best model.
+```{r}
+model <- regsubsets(Quality ~ ., data = wine, method = "backward")
+best_backward_model <- summary(model)$which[which.max(summary(model)$adjr2),]
+best_backward_predictors <- names(best_backward_model)[-1]
+best_backward_lm <- lm(Quality ~ ., data = wine[, c(best_backward_predictors,
+                                                  "Quality")])
+best_backward_mse <- compute_loocv(best_backward_lm)
+best_backward_mse
+```
+1(e)  Use ridge regression with penalty parameter chosen optimally via LOOCV to
+fit a linear regression model. Compute the test MSE of the model.
+```{r}
+ridge <- cv.glmnet(as.matrix(wine[, -1]), wine$Quality, alpha = 0)
+ridge_mse <- min(ridge$cvm)
+ridge_mse
+```
+1(f)  Use lasso with penalty parameter chosen optimally via LOOCV to fit a 
+linear regression model. Compute the test MSE of the model
+fit a linear regression model. Compute the test MSE of the model.
+```{r}
+lasso <- cv.glmnet(as.matrix(wine[, -1]), wine$Quality, alpha = 1)
+lasso_mse <- min(lasso$cvm)
+lasso_mse
+```
+1(g)  Make a tabular summary of the parameter estimates and test MSEs from
+(a) - (c). Compare the results. Which model(s) would you recommend?
+```{r}
+parameter_estimates <- c(coefficients(full)[-1],
+                         coefficients(best_subset_lm)[-1],
+                         coefficients(best_forward_lm)[-1],
+                         coefficients(best_backward_lm)[-1])
+test_mses <- c(full_mse, best_subset_mse, best_forward_mse, best_backward_mse)
+
+summary <- data.frame(Model = c("All Predictors", "Best Subset", 
+                                      "Forward Selection",
+                                      "Backward Selection"),
+                            Parameter_Estimates = parameter_estimates,
+                            Test_MSE = test_mses)
+
+print(summary)
+
+```
+
+
